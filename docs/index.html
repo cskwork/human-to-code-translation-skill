@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>human-to-code-translation · 사람의 풀이를 코드로 번역하는 Claude Code / Codex 스킬</title>
-<meta name="description" content="사람이 머릿속으로 푸는 방식을 기계가 실행하는 코드로 옮기는 6단계 번역 파이프라인과 매핑표. Python, Java, C 예제 포함. Claude Code / Codex 스킬.">
+<title>human-to-code-translation · the Claude Code / Codex skill that translates a human's solution into code</title>
+<meta name="description" content="A 6-step translation pipeline and mapping table that move the way a human solves a problem in their head into code a machine runs. Python, Java, C examples. A Claude Code / Codex skill.">
 <style>
 /*
   Single-mode lock: color-scheme is locked to light on purpose.
@@ -97,12 +97,50 @@ a:focus-visible, button:focus-visible, .btn:focus-visible {
   .navlinks .nav-secondary { display: none; } /* condense to keep nav on one line */
 }
 @media (max-width: 480px) {
-  /* narrow viewports: tighten nav so the row fits within the padded wrap (no page overflow) */
-  .nav .wrap { padding-inline: 16px; gap: 12px; }
-  .navlinks { gap: 14px; }
-  .brand { font-size: 14px; }
-  .navlinks a { font-size: 13.5px; }
+  /* narrow viewports: the long mono brand plus links + toggle cannot share one row,
+     so the nav wraps to two rows (brand, then links) and grows to fit. No page overflow. */
+  .nav .wrap {
+    padding-inline: 16px; gap: 8px 12px;
+    flex-wrap: wrap; height: auto; padding-block: 10px;
+  }
+  .navlinks { gap: 12px; flex-wrap: wrap; }
+  .brand { font-size: 13px; }
+  .navlinks a { font-size: 13px; }
+  .lang-toggle { gap: 2px; padding: 2px; }
+  .lang-toggle button { padding: 4px 8px; font-size: 12px; }
 }
+
+/* ---------- language toggle (segmented control) ---------- */
+.lang-toggle {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--surface); border: 1px solid var(--hair);
+  border-radius: var(--radius); padding: 3px;
+}
+.lang-toggle button {
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  line-height: 1; padding: 6px 11px; border: 0; cursor: pointer;
+  background: transparent; color: var(--muted); border-radius: 8px;
+  transition: background .15s ease, color .15s ease;
+  white-space: nowrap;
+}
+.lang-toggle button:hover { color: var(--text); }
+/* active language: solid accent fill + white text (white on #a84f33 = AA, same pair as CTA) */
+.lang-toggle button[aria-pressed="true"] {
+  background: var(--accent-fill); color: #fff;
+}
+
+/* ---------- bilingual visibility ----------
+   English is the DEFAULT-VISIBLE set with NO JavaScript: the Korean set is hidden by
+   CSS until the html.lang-ko class is set by the toggle script. So a no-JS visitor reads
+   clean English; JS only flips which set shows + updates <html lang> + localStorage.
+   Hide rules carry [class]-level specificity so they win over the inline-display rules. */
+html [data-lang="ko"] { display: none; }
+html.lang-ko [data-lang="ko"] { display: revert; }
+html.lang-ko [data-lang="en"] { display: none; }
+/* inline-level dual spans must keep flow inline (not block) when shown */
+[data-lang]:not([data-lang="ko"]):is(span, a, em, strong, code) { display: inline; }
+html.lang-ko [data-lang="ko"]:is(span, a, em, strong, code) { display: inline; }
+html.lang-ko [data-lang="en"]:is(span, a, em, strong, code) { display: none; }
 
 /* ---------- shared section ---------- */
 section { padding: 72px 0; border-bottom: 1px solid var(--hair); }
@@ -262,17 +300,21 @@ footer { padding: 48px 0 64px; border-bottom: none; background: var(--surface); 
 </style>
 </head>
 <body>
-<a class="skip" href="#top">본문 바로가기</a>
+<a class="skip" href="#top"><span data-lang="en">Skip to content</span><span data-lang="ko">본문 바로가기</span></a>
 
-<nav class="nav" aria-label="주요">
+<nav class="nav" aria-label="Primary">
   <div class="wrap">
     <a class="brand" href="#top">human-to-code-translation<span class="dot">.</span></a>
     <div class="navlinks">
-      <a class="nav-secondary" href="#pipeline">파이프라인</a>
-      <a class="nav-secondary" href="#mapping">매핑표</a>
-      <a class="nav-secondary" href="#example">예제</a>
-      <a href="#install">설치</a>
+      <a class="nav-secondary" href="#pipeline"><span data-lang="en">Pipeline</span><span data-lang="ko">파이프라인</span></a>
+      <a class="nav-secondary" href="#mapping"><span data-lang="en">Mapping</span><span data-lang="ko">매핑표</span></a>
+      <a class="nav-secondary" href="#example"><span data-lang="en">Example</span><span data-lang="ko">예제</span></a>
+      <a href="#install"><span data-lang="en">Install</span><span data-lang="ko">설치</span></a>
       <a class="nav-github" href="https://github.com/cskwork/human-to-code-translation-skill">GitHub</a>
+      <div class="lang-toggle" role="group" aria-label="Language / 언어">
+        <button type="button" id="lang-en" aria-pressed="true" aria-label="English">EN</button>
+        <button type="button" id="lang-ko" aria-pressed="false" aria-label="한국어">한국어</button>
+      </div>
     </div>
   </div>
 </nav>
@@ -282,20 +324,20 @@ footer { padding: 48px 0 64px; border-bottom: none; background: var(--surface); 
   <!-- 1. HERO -->
   <header class="hero">
     <div class="wrap reveal">
-      <p class="eyebrow">Claude Code / Codex 스킬</p>
-      <h1>사람의 풀이를 코드로 번역하는 다리를 놓는다</h1>
-      <p class="value">사람이 머릿속으로 푸는 방식을 기계(Python / Java / C)가 실행하는 코드로, 그 중간 다리를 단계적으로 놓아주는 스킬입니다.</p>
+      <p class="eyebrow"><span data-lang="en">A Claude Code / Codex skill</span><span data-lang="ko">Claude Code / Codex 스킬</span></p>
+      <h1><span data-lang="en">Build the bridge from a human's solution to code</span><span data-lang="ko">사람의 풀이를 코드로 번역하는 다리를 놓는다</span></h1>
+      <p class="value"><span data-lang="en">A skill that lays the bridge, step by step, from the way a human solves a problem in their head to the code a machine (Python / Java / C) actually runs.</span><span data-lang="ko">사람이 머릿속으로 푸는 방식을 기계(Python / Java / C)가 실행하는 코드로, 그 중간 다리를 단계적으로 놓아주는 스킬입니다.</span></p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/cskwork/human-to-code-translation-skill">GitHub에서 보기</a>
-        <a class="btn btn-ghost" href="#install">설치 방법</a>
+        <a class="btn btn-primary" href="https://github.com/cskwork/human-to-code-translation-skill"><span data-lang="en">View on GitHub</span><span data-lang="ko">GitHub에서 보기</span></a>
+        <a class="btn btn-ghost" href="#install"><span data-lang="en">How to install</span><span data-lang="ko">설치 방법</span></a>
       </div>
-      <div class="flow" aria-label="번역 파이프라인 한 줄 요약">
-        <span class="step">말</span><span class="arrow">→</span>
-        <span class="step">손풀이</span><span class="arrow">→</span>
-        <span class="step">규칙</span><span class="arrow">→</span>
-        <span class="step">변수/흐름</span><span class="arrow">→</span>
-        <span class="step">코드</span><span class="arrow">→</span>
-        <span class="step">트레이싱</span>
+      <div class="flow" aria-label="Translation pipeline, in one line / 번역 파이프라인 한 줄 요약">
+        <span class="step"><span data-lang="en">Words</span><span data-lang="ko">말</span></span><span class="arrow">→</span>
+        <span class="step"><span data-lang="en">Hand-solve</span><span data-lang="ko">손풀이</span></span><span class="arrow">→</span>
+        <span class="step"><span data-lang="en">Rules</span><span data-lang="ko">규칙</span></span><span class="arrow">→</span>
+        <span class="step"><span data-lang="en">Variables / flow</span><span data-lang="ko">변수/흐름</span></span><span class="arrow">→</span>
+        <span class="step"><span data-lang="en">Code</span><span data-lang="ko">코드</span></span><span class="arrow">→</span>
+        <span class="step"><span data-lang="en">Tracing</span><span data-lang="ko">트레이싱</span></span>
       </div>
     </div>
   </header>
@@ -303,50 +345,50 @@ footer { padding: 48px 0 64px; border-bottom: none; background: var(--surface); 
   <!-- 2. WHAT / 핵심 원리 -->
   <section id="what" class="band-surface prose">
     <div class="wrap">
-      <p class="eyebrow">핵심 원리</p>
-      <h2>코드는 갑자기 튀어나오지 않는다</h2>
-      <p class="lede">알고리즘에서 진짜 어려운 건 "푸는 것"이 아니라, 사람이 자연스럽게 하는 일을 기계가 따라 할 수 있는 형태로 번역하는 것입니다. 이 스킬은 그 번역을 6단계 파이프라인과 매핑표로 일관되게 수행합니다.</p>
-      <pre><code>말 → 손풀이 → 규칙(암묵지 명시화) → 변수/흐름 → 코드 → 트레이싱 검증</code></pre>
-      <p class="quote">다리의 <em>의미</em>는 언어와 무관하고(같음), 달라지는 건 <em>문법</em>뿐이다. 그래서 같은 풀이를 C/Java/Python으로 나란히 보여준다.</p>
+      <p class="eyebrow"><span data-lang="en">Core idea</span><span data-lang="ko">핵심 원리</span></p>
+      <h2><span data-lang="en">Code does not appear out of thin air</span><span data-lang="ko">코드는 갑자기 튀어나오지 않는다</span></h2>
+      <p class="lede"><span data-lang="en">The hard part of an algorithm is not "solving" it, but translating what a human does naturally into a form a machine can follow. This skill performs that translation consistently with a 6-step pipeline and a mapping table.</span><span data-lang="ko">알고리즘에서 진짜 어려운 건 "푸는 것"이 아니라, 사람이 자연스럽게 하는 일을 기계가 따라 할 수 있는 형태로 번역하는 것입니다. 이 스킬은 그 번역을 6단계 파이프라인과 매핑표로 일관되게 수행합니다.</span></p>
+      <pre><code data-lang="en">Words &rarr; Hand-solve &rarr; Rules (make the implicit explicit) &rarr; Variables / flow &rarr; Code &rarr; Trace-and-verify</code><code data-lang="ko">말 &rarr; 손풀이 &rarr; 규칙(암묵지 명시화) &rarr; 변수/흐름 &rarr; 코드 &rarr; 트레이싱 검증</code></pre>
+      <p class="quote"><span data-lang="en">The <em>meaning</em> of the bridge is independent of the language (it stays the same); only the <em>syntax</em> changes. That is why the same solution is shown side by side in C, Java, and Python.</span><span data-lang="ko">다리의 <em>의미</em>는 언어와 무관하고(같음), 달라지는 건 <em>문법</em>뿐이다. 그래서 같은 풀이를 C/Java/Python으로 나란히 보여준다.</span></p>
     </div>
   </section>
 
   <!-- 3. PIPELINE -->
   <section id="pipeline">
     <div class="wrap">
-      <p class="eyebrow">번역 파이프라인</p>
-      <h2>6단계, 항상 이 순서로</h2>
-      <p class="lede">코드는 한 번에 나오지 않습니다. 말에서 손풀이로, 규칙으로, 변수와 흐름으로, 그리고 트레이싱 검증까지 순서대로 옮겨집니다.</p>
+      <p class="eyebrow"><span data-lang="en">The translation pipeline</span><span data-lang="ko">번역 파이프라인</span></p>
+      <h2><span data-lang="en">Six steps, always in this order</span><span data-lang="ko">6단계, 항상 이 순서로</span></h2>
+      <p class="lede"><span data-lang="en">Code does not arrive all at once. It moves in order: from words to a hand-solve, to rules, to variables and flow, and finally to trace-and-verify.</span><span data-lang="ko">코드는 한 번에 나오지 않습니다. 말에서 손풀이로, 규칙으로, 변수와 흐름으로, 그리고 트레이싱 검증까지 순서대로 옮겨집니다.</span></p>
       <ol class="steps" style="list-style:none; padding:0; margin:0;">
         <li class="step-card">
           <span class="num">01</span>
-          <h3>사람 말로 다시 쓰기</h3>
-          <p>문제를 일상어로 옮기고, 손으로 풀 작은 구체 예제를 하나 정한다. 예: 배열 5칸, target 하나.</p>
+          <h3><span data-lang="en">Restate it in plain human words</span><span data-lang="ko">사람 말로 다시 쓰기</span></h3>
+          <p><span data-lang="en">Put the problem into everyday language and pick one small, concrete example to solve by hand. For example: an array of 5 cells, one target.</span><span data-lang="ko">문제를 일상어로 옮기고, 손으로 풀 작은 구체 예제를 하나 정한다. 예: 배열 5칸, target 하나.</span></p>
         </li>
         <li class="step-card">
           <span class="num">02</span>
-          <h3>손풀이 관찰</h3>
-          <p>답을 먼저 구하지 말고, 답에 이르는 절차를 본다. "내가 실제로 한 일"을 종이에 적어라.</p>
+          <h3><span data-lang="en">Watch your hand-solve</span><span data-lang="ko">손풀이 관찰</span></h3>
+          <p><span data-lang="en">Do not jump to the answer; watch the procedure that leads to it. Write down "what I actually did" on paper.</span><span data-lang="ko">답을 먼저 구하지 말고, 답에 이르는 절차를 본다. "내가 실제로 한 일"을 종이에 적어라.</span></p>
         </li>
         <li class="step-card">
           <span class="num">03</span>
-          <h3>암묵지 명시화</h3>
-          <p>"가운데를 본다", "큰 걸 고른다" 같은 그냥 아는 행동을 정확한 규칙으로 쪼갠다. 가운데 = <code>(low+high)//2</code>? 정수 나눗셈? off-by-one?</p>
+          <h3><span data-lang="en">Make the implicit explicit</span><span data-lang="ko">암묵지 명시화</span></h3>
+          <p><span data-lang="en">Break down the moves you "just know", like "look at the middle" or "pick the bigger one", into precise rules. Middle = <code>(low+high)//2</code>? Integer division? Off-by-one?</span><span data-lang="ko">"가운데를 본다", "큰 걸 고른다" 같은 그냥 아는 행동을 정확한 규칙으로 쪼갠다. 가운데 = <code>(low+high)//2</code>? 정수 나눗셈? off-by-one?</span></p>
         </li>
         <li class="step-card">
           <span class="num">04</span>
-          <h3>상태 → 변수/자료구조</h3>
-          <p>"내가 기억하고 있는 게 뭐지?"를 묻는다. 그 답이 곧 변수와 자료구조다. 아래 매핑표를 사전처럼 쓴다.</p>
+          <h3><span data-lang="en">State &rarr; variables / data structures</span><span data-lang="ko">상태 &rarr; 변수/자료구조</span></h3>
+          <p><span data-lang="en">Ask "what am I keeping in my head?" The answer is exactly your variables and data structures. Use the mapping table below like a dictionary.</span><span data-lang="ko">"내가 기억하고 있는 게 뭐지?"를 묻는다. 그 답이 곧 변수와 자료구조다. 아래 매핑표를 사전처럼 쓴다.</span></p>
         </li>
         <li class="step-card">
           <span class="num">05</span>
-          <h3>흐름과 종료 조건</h3>
-          <p>"~할 때까지" → <code>while</code> + 종료 조건, "~이면" → <code>if</code>, "하나씩" → <code>for</code>. 언제 멈추는지를 반드시 명시한다(무한 루프 방지).</p>
+          <h3><span data-lang="en">Flow and stop condition</span><span data-lang="ko">흐름과 종료 조건</span></h3>
+          <p><span data-lang="en">"Until ~" &rarr; <code>while</code> + a stop condition, "if ~" &rarr; <code>if</code>, "one by one" &rarr; <code>for</code>. Always state exactly when it stops (to prevent infinite loops).</span><span data-lang="ko">"~할 때까지" &rarr; <code>while</code> + 종료 조건, "~이면" &rarr; <code>if</code>, "하나씩" &rarr; <code>for</code>. 언제 멈추는지를 반드시 명시한다(무한 루프 방지).</span></p>
         </li>
         <li class="step-card">
           <span class="num">06</span>
-          <h3>코드 + 트레이싱 검증</h3>
-          <p>규칙 한 줄 ≈ 코드 한 줄로 받아쓴다. 그다음 "없는 값 / 맨 끝 / 빈 입력" 경계를 표로 손 트레이싱한다.</p>
+          <h3><span data-lang="en">Code + trace-and-verify</span><span data-lang="ko">코드 + 트레이싱 검증</span></h3>
+          <p><span data-lang="en">Transcribe it as roughly one rule &asymp; one line of code. Then hand-trace the edges, "missing value / very end / empty input", in a table.</span><span data-lang="ko">규칙 한 줄 &asymp; 코드 한 줄로 받아쓴다. 그다음 "없는 값 / 맨 끝 / 빈 입력" 경계를 표로 손 트레이싱한다.</span></p>
         </li>
       </ol>
     </div>
@@ -355,30 +397,33 @@ footer { padding: 48px 0 64px; border-bottom: none; background: var(--surface); 
   <!-- 4. MAPPING TABLE -->
   <section id="mapping" class="band-surface">
     <div class="wrap">
-      <p class="eyebrow">핵심 매핑표</p>
-      <h2>사람의 머릿속 행동 → 기계 구성요소</h2>
-      <p class="lede">이 표가 4단계(상태 → 변수)의 사전입니다. "사람의 표현"을 보고 오른쪽을 떠올리세요.</p>
+      <p class="eyebrow"><span data-lang="en">The core mapping table</span><span data-lang="ko">핵심 매핑표</span></p>
+      <h2><span data-lang="en">A human's mental move &rarr; a machine building block</span><span data-lang="ko">사람의 머릿속 행동 &rarr; 기계 구성요소</span></h2>
+      <p class="lede"><span data-lang="en">This table is the dictionary for step 4 (state &rarr; variables). Read the "human phrasing" and recall the right-hand side.</span><span data-lang="ko">이 표가 4단계(상태 &rarr; 변수)의 사전입니다. "사람의 표현"을 보고 오른쪽을 떠올리세요.</span></p>
       <div class="table-frame">
         <table>
-          <caption class="sr-caption" style="position:absolute;left:-9999px;">사람의 표현과 그에 대응하는 기계 구성요소 14행</caption>
+          <caption class="sr-caption" style="position:absolute;left:-9999px;"><span data-lang="en">Human phrasing and its corresponding machine building block, 14 rows</span><span data-lang="ko">사람의 표현과 그에 대응하는 기계 구성요소 14행</span></caption>
           <thead>
-            <tr><th scope="col">사람의 표현 / 머릿속 행동</th><th scope="col">기계 구성요소</th></tr>
+            <tr>
+              <th scope="col"><span data-lang="en">Human phrasing / mental move</span><span data-lang="ko">사람의 표현 / 머릿속 행동</span></th>
+              <th scope="col"><span data-lang="en">Machine building block</span><span data-lang="ko">기계 구성요소</span></th>
+            </tr>
           </thead>
           <tbody>
-            <tr><td>"기억해 둔다 / 머릿속에 담아둔다"</td><td>변수 (variable)</td></tr>
-            <tr><td>"쭉 훑어본다 / 하나씩 차례로 본다"</td><td><code>for</code> 반복문</td></tr>
-            <tr><td>"~인 동안 계속 / ~할 때까지"</td><td><code>while</code> + 종료 조건</td></tr>
-            <tr><td>"가장 큰/작은 걸 고른다"</td><td>max/min 추적 변수 + 비교</td></tr>
-            <tr><td>"지금까지 중 제일 ~"</td><td>누적 변수 (running best/sum)</td></tr>
-            <tr><td>"본 적 있나? / 중복인가?"</td><td>집합(set) / 딕셔너리 membership</td></tr>
-            <tr><td>"이름표 붙여 분류해 모은다"</td><td>딕셔너리/맵 그룹핑</td></tr>
-            <tr><td>"짝을 맞춘다 / 가장 최근 것부터 되돌린다"</td><td>스택(stack)</td></tr>
-            <tr><td>"줄 세워 들어온 순서대로 처리"</td><td>큐(queue)</td></tr>
-            <tr><td>"양쪽 끝에서 가운데로 좁혀온다"</td><td>투 포인터 (두 인덱스 변수)</td></tr>
-            <tr><td>"경우를 나눠서"</td><td><code>if</code> / <code>elif</code> / <code>else</code></td></tr>
-            <tr><td>"표를 그려 칸을 채워나간다"</td><td>2차원 배열 / DP 테이블</td></tr>
-            <tr><td>"n번 똑같이 한다"</td><td><code>for i in range(n)</code></td></tr>
-            <tr><td>"더 작은 같은 문제로 쪼갠다"</td><td>재귀 (recursion)</td></tr>
+            <tr><td><span data-lang="en">"keep it in mind / hold it in my head"</span><span data-lang="ko">"기억해 둔다 / 머릿속에 담아둔다"</span></td><td><span data-lang="en">variable</span><span data-lang="ko">변수 (variable)</span></td></tr>
+            <tr><td><span data-lang="en">"scan through / look at them one at a time"</span><span data-lang="ko">"쭉 훑어본다 / 하나씩 차례로 본다"</span></td><td><span data-lang="en"><code>for</code> loop</span><span data-lang="ko"><code>for</code> 반복문</span></td></tr>
+            <tr><td><span data-lang="en">"as long as ~ / until ~"</span><span data-lang="ko">"~인 동안 계속 / ~할 때까지"</span></td><td><span data-lang="en"><code>while</code> + stop condition</span><span data-lang="ko"><code>while</code> + 종료 조건</span></td></tr>
+            <tr><td><span data-lang="en">"pick the largest / smallest"</span><span data-lang="ko">"가장 큰/작은 걸 고른다"</span></td><td><span data-lang="en">max/min tracking variable + comparison</span><span data-lang="ko">max/min 추적 변수 + 비교</span></td></tr>
+            <tr><td><span data-lang="en">"the best so far"</span><span data-lang="ko">"지금까지 중 제일 ~"</span></td><td><span data-lang="en">running variable (running best/sum)</span><span data-lang="ko">누적 변수 (running best/sum)</span></td></tr>
+            <tr><td><span data-lang="en">"have I seen this? / is it a duplicate?"</span><span data-lang="ko">"본 적 있나? / 중복인가?"</span></td><td><span data-lang="en">set / dictionary membership</span><span data-lang="ko">집합(set) / 딕셔너리 membership</span></td></tr>
+            <tr><td><span data-lang="en">"label, sort into groups, and collect"</span><span data-lang="ko">"이름표 붙여 분류해 모은다"</span></td><td><span data-lang="en">dictionary / map grouping</span><span data-lang="ko">딕셔너리/맵 그룹핑</span></td></tr>
+            <tr><td><span data-lang="en">"match pairs / undo from the most recent"</span><span data-lang="ko">"짝을 맞춘다 / 가장 최근 것부터 되돌린다"</span></td><td><span data-lang="en">stack</span><span data-lang="ko">스택(stack)</span></td></tr>
+            <tr><td><span data-lang="en">"process in the order they lined up"</span><span data-lang="ko">"줄 세워 들어온 순서대로 처리"</span></td><td><span data-lang="en">queue</span><span data-lang="ko">큐(queue)</span></td></tr>
+            <tr><td><span data-lang="en">"close in toward the middle from both ends"</span><span data-lang="ko">"양쪽 끝에서 가운데로 좁혀온다"</span></td><td><span data-lang="en">two pointers (two index variables)</span><span data-lang="ko">투 포인터 (두 인덱스 변수)</span></td></tr>
+            <tr><td><span data-lang="en">"split into cases"</span><span data-lang="ko">"경우를 나눠서"</span></td><td><span data-lang="en"><code>if</code> / <code>elif</code> / <code>else</code></span><span data-lang="ko"><code>if</code> / <code>elif</code> / <code>else</code></span></td></tr>
+            <tr><td><span data-lang="en">"draw a grid and fill the cells in"</span><span data-lang="ko">"표를 그려 칸을 채워나간다"</span></td><td><span data-lang="en">2D array / DP table</span><span data-lang="ko">2차원 배열 / DP 테이블</span></td></tr>
+            <tr><td><span data-lang="en">"do the same thing n times"</span><span data-lang="ko">"n번 똑같이 한다"</span></td><td><span data-lang="en"><code>for i in range(n)</code></span><span data-lang="ko"><code>for i in range(n)</code></span></td></tr>
+            <tr><td><span data-lang="en">"break it into a smaller version of the same problem"</span><span data-lang="ko">"더 작은 같은 문제로 쪼갠다"</span></td><td><span data-lang="en">recursion</span><span data-lang="ko">재귀 (recursion)</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -388,16 +433,26 @@ footer { padding: 48px 0 64px; border-bottom: none; background: var(--surface); 
   <!-- 5. WORKED EXAMPLE: BINARY SEARCH, 3 LANGUAGES -->
   <section id="example">
     <div class="wrap">
-      <p class="eyebrow">워크드 예제</p>
-      <h2>이진 탐색, 세 언어로 나란히</h2>
-      <p class="lede">정렬된 배열에서 target의 자리 번호를 찾고, 없으면 -1을 반환합니다. 같은 다리(low/high/mid 로직)를 Python, Java, C로 동시에 봅니다.</p>
+      <p class="eyebrow"><span data-lang="en">Worked example</span><span data-lang="ko">워크드 예제</span></p>
+      <h2><span data-lang="en">Binary search, side by side in three languages</span><span data-lang="ko">이진 탐색, 세 언어로 나란히</span></h2>
+      <p class="lede"><span data-lang="en">Find the index of target in a sorted array, and return -1 if it is not there. See the same bridge (the low/high/mid logic) at once in Python, Java, and C.</span><span data-lang="ko">정렬된 배열에서 target의 자리 번호를 찾고, 없으면 -1을 반환합니다. 같은 다리(low/high/mid 로직)를 Python, Java, C로 동시에 봅니다.</span></p>
       <div class="problem">
-        예제: <code>[2,5,8,12,19]</code>, target=12. 사전을 찾듯 가운데를 펴고, target이 더 크면 왼쪽 절반을 통째로 버린다. "양쪽 끝에서 좁혀온다" → 두 인덱스 <code>low</code>, <code>high</code>. "두 손가락이 안 엇갈리는 동안" → <code>while low &lt;= high</code>.
+        <span data-lang="en">Example: <code>[2,5,8,12,19]</code>, target=12. Like looking something up in a dictionary, open to the middle; if target is larger, throw away the whole left half. "Close in from both ends" &rarr; two indices <code>low</code>, <code>high</code>. "As long as the two fingers have not crossed" &rarr; <code>while low &lt;= high</code>.</span><span data-lang="ko">예제: <code>[2,5,8,12,19]</code>, target=12. 사전을 찾듯 가운데를 펴고, target이 더 크면 왼쪽 절반을 통째로 버린다. "양쪽 끝에서 좁혀온다" &rarr; 두 인덱스 <code>low</code>, <code>high</code>. "두 손가락이 안 엇갈리는 동안" &rarr; <code>while low &lt;= high</code>.</span>
       </div>
       <div class="codegrid">
         <div class="codecol">
           <div class="lang"><span class="tick" aria-hidden="true"></span>Python</div>
-<pre><code># Python: 길이는 len(), 정수 나눗셈 //
+<pre data-lang="en"><code># Python: length is len(), integer division //
+def search(arr, target):
+    low, high = 0, len(arr) - 1
+    while low &lt;= high:
+        mid = (low + high) // 2
+        if arr[mid] == target:   return mid
+        elif arr[mid] &lt; target:  low = mid + 1   # answer is on the right
+        else:                    high = mid - 1  # answer is on the left
+    return -1
+</code></pre>
+<pre data-lang="ko"><code># Python: 길이는 len(), 정수 나눗셈 //
 def search(arr, target):
     low, high = 0, len(arr) - 1
     while low &lt;= high:
@@ -410,7 +465,19 @@ def search(arr, target):
         </div>
         <div class="codecol">
           <div class="lang"><span class="tick" aria-hidden="true"></span>Java</div>
-<pre><code>// Java: 길이는 .length, mid는 오버플로 안전식
+<pre data-lang="en"><code>// Java: length is .length, mid uses the overflow-safe form
+int search(int[] arr, int target) {
+    int low = 0, high = arr.length - 1;
+    while (low &lt;= high) {
+        int mid = low + (high - low) / 2;
+        if (arr[mid] == target) return mid;
+        else if (arr[mid] &lt; target) low = mid + 1;
+        else high = mid - 1;
+    }
+    return -1;
+}
+</code></pre>
+<pre data-lang="ko"><code>// Java: 길이는 .length, mid는 오버플로 안전식
 int search(int[] arr, int target) {
     int low = 0, high = arr.length - 1;
     while (low &lt;= high) {
@@ -425,7 +492,19 @@ int search(int[] arr, int target) {
         </div>
         <div class="codecol">
           <div class="lang"><span class="tick" aria-hidden="true"></span>C</div>
-<pre><code>/* C: 배열 길이를 인자로 따로 받아야 함 */
+<pre data-lang="en"><code>/* C: the array length must be passed in as a separate argument */
+int search(int arr[], int n, int target) {
+    int low = 0, high = n - 1;
+    while (low &lt;= high) {
+        int mid = low + (high - low) / 2;
+        if (arr[mid] == target) return mid;
+        else if (arr[mid] &lt; target) low = mid + 1;
+        else high = mid - 1;
+    }
+    return -1;
+}
+</code></pre>
+<pre data-lang="ko"><code>/* C: 배열 길이를 인자로 따로 받아야 함 */
 int search(int arr[], int n, int target) {
     int low = 0, high = n - 1;
     while (low &lt;= high) {
@@ -439,39 +518,39 @@ int search(int arr[], int n, int target) {
 </code></pre>
         </div>
       </div>
-      <p class="takeaway"><strong>번역의 교훈:</strong> 의미(가운데 비교 → 절반 버리기)는 셋 다 똑같다. 차이는 길이 얻는 법(<code>len()</code> / <code>.length</code> / 인자), 오버플로 주의(Java·C는 <code>low+(high-low)/2</code>), 타입 명시뿐이다. 다리를 한 번 놓으면 언어는 갈아끼우면 된다.</p>
+      <p class="takeaway"><span data-lang="en"><strong>The translation lesson:</strong> the meaning (compare the middle, then drop half) is the same in all three. The differences are just how you get the length (<code>len()</code> / <code>.length</code> / an argument), the overflow caution (Java and C use <code>low+(high-low)/2</code>), and explicit typing. Lay the bridge once, and you can swap the language out.</span><span data-lang="ko"><strong>번역의 교훈:</strong> 의미(가운데 비교 &rarr; 절반 버리기)는 셋 다 똑같다. 차이는 길이 얻는 법(<code>len()</code> / <code>.length</code> / 인자), 오버플로 주의(Java·C는 <code>low+(high-low)/2</code>), 타입 명시뿐이다. 다리를 한 번 놓으면 언어는 갈아끼우면 된다.</span></p>
     </div>
   </section>
 
   <!-- 6. INSTALL -->
   <section id="install" class="band-surface">
     <div class="wrap">
-      <p class="eyebrow">설치</p>
-      <h2>Claude Code에 설치</h2>
-      <p class="lede">스킬 저장소를 클론합니다. 복사 시 한 줄로 동작합니다.</p>
+      <p class="eyebrow"><span data-lang="en">Install</span><span data-lang="ko">설치</span></p>
+      <h2><span data-lang="en">Install into Claude Code</span><span data-lang="ko">Claude Code에 설치</span></h2>
+      <p class="lede"><span data-lang="en">Clone the skill repository. It works as a single line when you copy it.</span><span data-lang="ko">스킬 저장소를 클론합니다. 복사 시 한 줄로 동작합니다.</span></p>
 <pre><code>git clone https://github.com/cskwork/human-to-code-translation-skill.git \
   ~/.claude/skills/human-to-code-translation</code></pre>
-      <p class="install-note"><code>description</code>의 트리거(예: "머릿속으론 풀리는데 코드가 안 써져", 알고리즘 문제를 코드로 옮기기, off-by-one/무한루프)가 잡히면 자동으로 로드됩니다.</p>
+      <p class="install-note"><span data-lang="en">It loads automatically when a trigger in the <code>description</code> is detected (for example "I can solve it in my head but cannot write the code", turning an algorithm problem into code, off-by-one / infinite loop).</span><span data-lang="ko"><code>description</code>의 트리거(예: "머릿속으론 풀리는데 코드가 안 써져", 알고리즘 문제를 코드로 옮기기, off-by-one/무한루프)가 잡히면 자동으로 로드됩니다.</span></p>
     </div>
   </section>
 
   <!-- 7. WHO -->
   <section id="who">
     <div class="wrap">
-      <p class="eyebrow">누구에게</p>
-      <h2>이 스킬이 필요한 사람</h2>
+      <p class="eyebrow"><span data-lang="en">Who it is for</span><span data-lang="ko">누구에게</span></p>
+      <h2><span data-lang="en">Who needs this skill</span><span data-lang="ko">이 스킬이 필요한 사람</span></h2>
       <div class="who-list">
         <div class="who-card">
-          <span class="tag">가르치는 사람</span>
-          <p>알고리즘/코딩테스트를 가르치며 입문자에게 "왜 이 코드가 이렇게 되는지" 설명해야 하는 사람.</p>
+          <span class="tag"><span data-lang="en">People who teach</span><span data-lang="ko">가르치는 사람</span></span>
+          <p><span data-lang="en">Anyone teaching algorithms or coding tests who has to explain to beginners "why this code ends up the way it does".</span><span data-lang="ko">알고리즘/코딩테스트를 가르치며 입문자에게 "왜 이 코드가 이렇게 되는지" 설명해야 하는 사람.</span></p>
         </div>
         <div class="who-card">
-          <span class="tag">옮기지 못하는 학습자</span>
-          <p>"사람으로는 풀겠는데 코드로 못 옮기겠다"는 상태에서 막혀 있는 학습자.</p>
+          <span class="tag"><span data-lang="en">Learners who cannot make the jump</span><span data-lang="ko">옮기지 못하는 학습자</span></span>
+          <p><span data-lang="en">Learners stuck in the "I can solve it as a human but cannot turn it into code" state.</span><span data-lang="ko">"사람으로는 풀겠는데 코드로 못 옮기겠다"는 상태에서 막혀 있는 학습자.</span></p>
         </div>
         <div class="who-card">
-          <span class="tag">경계 조건에 막히는 사람</span>
-          <p>off-by-one, 무한 루프 같은 경계/종료 조건에서 자꾸 막히는 사람.</p>
+          <span class="tag"><span data-lang="en">People stuck on edge conditions</span><span data-lang="ko">경계 조건에 막히는 사람</span></span>
+          <p><span data-lang="en">People who keep getting stuck on edge and stop conditions like off-by-one and infinite loops.</span><span data-lang="ko">off-by-one, 무한 루프 같은 경계/종료 조건에서 자꾸 막히는 사람.</span></p>
         </div>
       </div>
     </div>
@@ -485,18 +564,51 @@ int search(int arr[], int n, int target) {
     <div class="foot-grid">
       <div class="meta">
         <a class="brand" href="#top">human-to-code-translation<span class="dot">.</span></a>
-        <p>스택, 해시, DP로의 번역 등 더 많은 워크드 예제는 저장소의 <code>worked-examples.md</code>에서 볼 수 있습니다.</p>
+        <p><span data-lang="en">More worked examples, including translations into stack, hash, and DP, are in <code>worked-examples.md</code> in the repository.</span><span data-lang="ko">스택, 해시, DP로의 번역 등 더 많은 워크드 예제는 저장소의 <code>worked-examples.md</code>에서 볼 수 있습니다.</span></p>
         <p class="license">MIT License</p>
       </div>
-      <nav class="foot-links" aria-label="바닥글">
-        <a href="https://github.com/cskwork/human-to-code-translation-skill">GitHub 저장소</a>
-        <a href="https://cskwork.github.io/human-to-code-translation-skill/">랜딩 페이지</a>
-        <a href="#install">설치</a>
-        <a href="#mapping">매핑표</a>
+      <nav class="foot-links" aria-label="Footer / 바닥글">
+        <a href="https://github.com/cskwork/human-to-code-translation-skill"><span data-lang="en">GitHub repository</span><span data-lang="ko">GitHub 저장소</span></a>
+        <a href="https://cskwork.github.io/human-to-code-translation-skill/"><span data-lang="en">Landing page</span><span data-lang="ko">랜딩 페이지</span></a>
+        <a href="#install"><span data-lang="en">Install</span><span data-lang="ko">설치</span></a>
+        <a href="#mapping"><span data-lang="en">Mapping</span><span data-lang="ko">매핑표</span></a>
       </nav>
     </div>
   </div>
 </footer>
+
+<script>
+/* Bilingual toggle, vanilla JS, no dependencies.
+   English is the default-visible set via CSS, so this script is purely additive:
+   it restores a stored choice, flips the html.lang-ko class + <html lang>, and
+   keeps the segmented control's aria-pressed in sync. With JS off, English shows. */
+(function () {
+  var KEY = 'h2c-lang';
+  var root = document.documentElement;
+  var enBtn = document.getElementById('lang-en');
+  var koBtn = document.getElementById('lang-ko');
+
+  function apply(lang) {
+    var ko = lang === 'ko';
+    root.classList.toggle('lang-ko', ko);
+    root.lang = ko ? 'ko' : 'en';
+    enBtn.setAttribute('aria-pressed', ko ? 'false' : 'true');
+    koBtn.setAttribute('aria-pressed', ko ? 'true' : 'false');
+  }
+
+  function set(lang) {
+    apply(lang);
+    try { localStorage.setItem(KEY, lang); } catch (e) {}
+  }
+
+  var stored;
+  try { stored = localStorage.getItem(KEY); } catch (e) {}
+  apply(stored === 'ko' ? 'ko' : 'en'); // default English when nothing stored
+
+  enBtn.addEventListener('click', function () { set('en'); });
+  koBtn.addEventListener('click', function () { set('ko'); });
+})();
+</script>
 
 </body>
 </html>
