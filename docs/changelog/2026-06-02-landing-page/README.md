@@ -27,3 +27,5 @@ Objective: 이 레포의 랜딩 페이지를 만들어 GitHub Pages에 호스팅
 ## Escalations
 
 - (없음 — 추가 시 기록)
+
+- 2026-06-02: RE-PLAN: 사용자 추가 요청 "기본 영어 + 한국어 전환". plan.md non-goal(다국어 토글 없음)을 사용자 지시로 오버라이드. 영어 기본 + nav 토글(EN/한국어) + 인라인 JS(외부 의존성 0 유지) + localStorage + noscript 영어 폴백. AC10/AC11은 1차 배포(commit 63551fd)로 검증 완료(라이브 200).

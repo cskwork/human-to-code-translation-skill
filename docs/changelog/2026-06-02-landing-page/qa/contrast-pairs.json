@@ -41,5 +41,8 @@
   { "el": "section h2 heading on surface bg (--text on --surface)", "fg": "#1a1a1a", "bg": "#ffffff", "size": "large" },
   { "el": "accent tick marker decorative (--accent on --bg)", "fg": "#d97757", "bg": "#faf9f7", "size": "decorative" },
   { "el": "brand dot decorative (--accent on nav bg)", "fg": "#d97757", "bg": "#faf9f7", "size": "decorative" },
-  { "el": "flow arrow decorative (--accent on --surface)", "fg": "#d97757", "bg": "#ffffff", "size": "decorative" }
+  { "el": "flow arrow decorative (--accent on --surface)", "fg": "#d97757", "bg": "#ffffff", "size": "decorative" },
+  { "el": "lang toggle ACTIVE text white on accent-fill (.lang-toggle button[aria-pressed=true] #fff on --accent-fill)", "fg": "#ffffff", "bg": "#a84f33", "size": "normal" },
+  { "el": "lang toggle INACTIVE text muted on toggle surface (.lang-toggle button --muted on --surface)", "fg": "#57534e", "bg": "#ffffff", "size": "normal" },
+  { "el": "lang toggle INACTIVE hover text on toggle surface (.lang-toggle button:hover --text on --surface)", "fg": "#1a1a1a", "bg": "#ffffff", "size": "normal" }
 ]

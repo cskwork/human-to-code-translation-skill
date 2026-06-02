@@ -3,12 +3,16 @@
   "slug": "landing-page",
   "mode": "GREENFIELD",
   "topology": "single-driver",
-  "current_phase": "Build",
+  "current_phase": "Deliver",
   "phases_completed": [
     "Intake",
     "Validate",
     "Plan",
-    "Human Feedback"
+    "Human Feedback",
+    "Build",
+    "Verify",
+    "QA",
+    "Committee"
   ],
   "go_decision": "GO",
   "approval": {
@@ -22,7 +26,7 @@
     "validate": 0,
     "plan": 0,
     "human_feedback": 0,
-    "build": 2,
+    "build": 3,
     "verify": 0,
     "qa": 1,
     "deliver": 0,

@@ -9,6 +9,18 @@ claim S1: GREEN
 - observed: `OK 20392 bytes`, exit 0. Re-ran, stable. Matches expected ("OK <n> bytes", exit 0).
 - side: `docs/.nojekyll` exists (0-byte file, confirmed via `ls -la`).
 
+claim S2-i18n: GREEN
+- run-to-prove: `node -e "const h=require('fs').readFileSync('docs/index.html','utf8');const need=['<html lang=\"en\">','data-lang=\"en\"','data-lang=\"ko\"','id=\"lang-en\"','id=\"lang-ko\"','aria-pressed','h2c-lang','id=\"pipeline\"','id=\"mapping\"','git clone https://github.com/cskwork/human-to-code-translation-skill.git'];const miss=need.filter(s=>!h.includes(s));if(miss.length){console.error('MISSING',miss);process.exit(1)}if(/—/.test(h)){console.error('EM-DASH FOUND');process.exit(1)}const hosts=[...h.matchAll(/https?:\/\/([^\/\"\s]+)/g)].map(m=>m[1]).filter(x=>!/github\.com|cskwork\.github\.io/.test(x));if(hosts.length){console.error('EXTERNAL HOSTS',hosts);process.exit(1)}console.log('OK',h.length,'bytes, no em-dash, no external hosts')"`
+- observed: `OK 36028 bytes, no em-dash, no external hosts`, exit 0. (Byte count differs from the claims.md prose because the file grew with the bilingual dual blocks; the claim only requires `OK <n> bytes`.)
+- contrast-gate: `node /Users/chaeseong-gug/.claude/skills/supergoal/templates/contrast-gate.mjs docs/changelog/2026-06-02-landing-page/qa/contrast-pairs.json` -> `== CONTRAST GATE PASS ==`, `checked 43 text pair(s), 0 below threshold`, exit 0. The 3 added toggle pairs (lang toggle ACTIVE white-on-fill 5.48:1, INACTIVE muted-on-surface 7.63:1, INACTIVE hover 17.40:1) all PASS.
+- em-dash: `grep -c '—' docs/index.html` = 0 (no literal em-dash in either language's authored prose). Arrows are entities (`&rarr;`).
+- browser re-proof (agent-browser 0.26.0, served http://localhost:8799/index.html):
+  - FRESH (localStorage cleared, reloaded): `document.documentElement.lang === 'en'`, no `lang-ko` class, `localStorage['h2c-lang'] === null`; English hero "Build the bridge from a human's solution to code" visible, Korean hero `getComputedStyle(...).display === 'none'` (hidden); `#lang-en` aria-pressed=true, `#lang-ko` aria-pressed=false. EN-by-default proven.
+  - Click `#lang-ko`: lang='ko', `lang-ko` class set, Korean visible, English hidden, `localStorage['h2c-lang']='ko'`, aria-pressed flips (en=false, ko=true).
+  - Reload: KO persisted (lang='ko', stored='ko', ko aria-pressed=true). Switch to EN, reload: EN persisted (lang='en', no lang-ko class, stored='en', en aria-pressed=true).
+  - No-JS (empirical, CDP `Emulation.setScriptExecutionDisabled:true` on a fresh tab, then navigate): `{htmlLang:'en', hasLangKoClass:false, enVisible:true, enText:"Build the bridge from a human's solution to code", koHidden:true}`. With JS off, the visitor reads clean English. Confirmed structurally too: `docs/index.html:2` `<html lang="en">` is hard-coded; CSS default rule `docs/index.html:137` `html [data-lang="ko"] { display:none; }` hides Korean and English `[data-lang="en"]` is the default-visible set; NO default `class="lang-ko"` on `<html>` (grep = none).
+  - 360px no overflow BOTH langs: viewport 360x800, EN active `{scrollWidth:345, innerWidth:360, noOverflow:true}`; toggled to KO `{scrollWidth:345, innerWidth:360, noOverflow:true}`. Screenshots: `qa/to-be-en-mobile.png`, `qa/to-be-ko-mobile.png` (both show real content, nav fits, active toggle button white-on-fill).
+
 ## Per-AC findings (independent grep/parse of docs/index.html)
 
 AC1 valid HTML5 — GREEN. `docs/index.html:1` `<!doctype html>`; `docs/index.html:6` `<title>...</title>`.
@@ -53,6 +65,7 @@ escape check — GREEN. All comparison operators inside displayed code are entit
 | AC9 a11y (contrast/focus/reduced-motion/lang/color-scheme) | body/prose AAA: --text 16.54:1, --muted 7.25:1; accent-as-text (links/labels) --accent-ink 5.21:1 = AA by deliberate WCAG link/UI convention; focus-visible :65; reduced-motion :245; lang=ko :2; color-scheme :17 | GREEN (AAA body) with named deviation (accent-as-text AA) |
 | em-dash absence | grep `—` = none | GREEN |
 | escape (&lt;) in code | index.html:394,397,407,410,422,425 | GREEN |
+| i18n: EN default + KO toggle + persist + no-JS English fallback | FRESH browser: lang='en', KO display:none, stored=null (EN default); click `#lang-ko` -> lang='ko', stored='ko', aria-pressed flips; reload persists KO, switch+reload persists EN; no-JS (CDP setScriptExecutionDisabled) -> lang='en', English visible, Korean hidden; `<html lang="en">` hard-coded index.html:2, default-hide-KO CSS :137, no default lang-ko class; 360px EN+KO scrollWidth 345<=360 no overflow; qa/to-be-en-mobile.png + qa/to-be-ko-mobile.png; contrast-gate 43 pairs (incl 3 toggle) exit 0, 0 fail | GREEN |
 
 Not covered: AC10 (Pages serves 200) and AC11 (homepageUrl) are DEPLOY-TIME — deferred to Deliver/QA phase, not verifiable in this build run. Nothing else was unverifiable.
 
@@ -113,3 +126,31 @@ Golden (desktop 1280 happy path): renders fully, hero + 3-lang grid (3 cols) + 1
 
 ### Verdict
 QA: PASS — Re-run after Rewind 1. Contrast gate exits 0 (40 text pairs checked, 0 below AA). Fixed page re-captured at 1280 and 390; hero, 17.5px body font, 3-lang grid (collapses to 1 col on mobile), and 14-row table all confirmed via DOM probes with no horizontal overflow at either width. taste §14 pre-flight all PASS. Local http.server (port 8799) was started for this run and stopped at the end (`lsof -ti tcp:8799 | xargs kill`; port confirmed clear).
+
+### QA i18n re-run (cycle 3, bilingual EN-default + KO toggle)
+Independent adversarial re-proof of CLAIM S2-i18n on the live page served over http. Re-proved from a real browser; the page/gates were not edited.
+
+Tool: agent-browser 0.26.0
+`agent-browser doctor` — Summary: 8 pass, 0 warn, 0 fail (Chrome 148.0.7778.179; headless launch + about:blank in 1.55s; Chrome for Testing CDN reachable HTTP 200).
+
+Server: `cd .../docs && python3 -m http.server 8799 &` (curl `/index.html` -> 200); stopped at end via `lsof -ti tcp:8799 | xargs kill` -> "PORT 8799 CLEAR".
+
+Screenshots:
+- `docs/changelog/2026-06-02-landing-page/qa/to-be-en-mobile.png` (viewport 360x800, EN active)
+- `docs/changelog/2026-06-02-landing-page/qa/to-be-ko-mobile.png` (viewport 360x800, KO active)
+
+EN-default (FRESH state, localStorage cleared + reloaded): `lang='en'`, no `lang-ko` class, `localStorage['h2c-lang']=null`; English hero visible, Korean hero `display:none`; `#lang-en` aria-pressed=true / `#lang-ko` aria-pressed=false. PASS.
+
+Toggle: click `#lang-ko` -> lang='ko', `lang-ko` class set, Korean visible, English hidden, `localStorage['h2c-lang']='ko'`, aria-pressed flips (en=false, ko=true). PASS.
+
+Persist: reload -> KO persisted (lang='ko', stored='ko', ko aria-pressed=true). Switch to EN, reload -> EN persisted (lang='en', no lang-ko class, stored='en', en aria-pressed=true). PASS.
+
+No-JS English fallback: empirical via CDP `Emulation.setScriptExecutionDisabled:true` on a fresh tab, then navigate -> `{htmlLang:'en', hasLangKoClass:false, enVisible:true, enText:"Build the bridge from a human's solution to code", koHidden:true}`. JS-off visitor reads English. Confirmed in markup/CSS: `<html lang="en">` hard-coded (index.html:2), `html [data-lang="ko"]{display:none}` default-hides Korean (index.html:137), no default `class="lang-ko"` on `<html>` (grep = none). PASS.
+
+360px no overflow (both langs): EN active `{scrollWidth:345, innerWidth:360, noOverflow:true}`; toggled to KO `{scrollWidth:345, innerWidth:360, noOverflow:true}`. Screenshots show nav fitting and active toggle button white-on-fill. PASS.
+
+Contrast gate (now includes 3 toggle pairs): `node .../contrast-gate.mjs docs/changelog/2026-06-02-landing-page/qa/contrast-pairs.json` -> exit 0, `checked 43 text pair(s), 0 below threshold` (== CONTRAST GATE PASS ==). Toggle pairs: ACTIVE white-on-fill 5.48:1, INACTIVE muted-on-surface 7.63:1, INACTIVE hover 17.40:1 — all PASS.
+
+Em-dash: `grep -c '—' docs/index.html` = 0 in both languages' authored prose.
+
+QA: PASS
