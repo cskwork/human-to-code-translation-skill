@@ -1,0 +1,42 @@
+{
+  "objective": "human-to-code-translation-skill 랜딩 페이지 생성 + GitHub Pages 호스팅 + repo description(homepageUrl)에 링크 추가",
+  "slug": "landing-page",
+  "mode": "GREENFIELD",
+  "topology": "single-driver",
+  "current_phase": "Build",
+  "phases_completed": [
+    "Intake",
+    "Validate",
+    "Plan",
+    "Human Feedback"
+  ],
+  "go_decision": "GO",
+  "approval": {
+    "phase": "Build",
+    "status": "APPROVED"
+  },
+  "approval_target_phase": "Build",
+  "plan_hash": "b5343c709a6e032707ee896b2f2b94fe543a5cecaed109687cb1b982e4e184c9",
+  "cycles": {
+    "intake": 0,
+    "validate": 0,
+    "plan": 0,
+    "human_feedback": 0,
+    "build": 2,
+    "verify": 0,
+    "qa": 1,
+    "deliver": 0,
+    "reproduce": 0,
+    "diagnose": 0,
+    "fix": 0,
+    "explore": 0
+  },
+  "max_cycles_per_phase": 5,
+  "error_signatures": {
+    "nav overflow at 360px index.html .navlinks": 1
+  },
+  "circuit_breaker_threshold": 3,
+  "skipped_phases": [],
+  "started_at": "2026-06-02",
+  "updated_at": "2026-06-02"
+}
