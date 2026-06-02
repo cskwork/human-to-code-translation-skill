@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>human-to-code-translation · 사람의 풀이를 코드로 번역하는 Claude Code / Codex 스킬</title>
+<meta name="description" content="사람이 머릿속으로 푸는 방식을 기계가 실행하는 코드로 옮기는 6단계 번역 파이프라인과 매핑표. Python, Java, C 예제 포함. Claude Code / Codex 스킬.">
+<style>
+/*
+  Single-mode lock: color-scheme is locked to light on purpose.
+  This is a developer-doc landing whose verified palette (plan.md) ships only a
+  light token set with computed AAA body contrast (#1a1a1a on #faf9f7 = 16.54:1).
+  No dark token set is verified, so we declare light explicitly rather than leave
+  the browser to guess and apply an unverified dark UA inversion to form/code.
+*/
+:root {
+  color-scheme: light;
+
+  --bg: #faf9f7;          /* warm off-white page base */
+  --surface: #ffffff;     /* elevated panels / tables / code frames */
+  --text: #1a1a1a;        /* body, 16.54:1 on --bg -> AAA */
+  --muted: #57534e;       /* captions, 7.25:1 on --bg -> AAA bound */
+  --accent: #d97757;      /* clay-coral, decoration only (rules/borders/markers) */
+  --accent-ink: #a84f33;  /* accent-as-text, 5.21:1 on --bg / 5.48:1 on --surface -> AA */
+  --accent-fill: #a84f33; /* solid CTA fill under white text, 5.48:1 -> AA */
+  --code-bg: #2b2622;     /* warm near-black code background */
+  --code-fg: #e8e6e3;     /* code text, 12.02:1 on --code-bg -> AAA */
+  --hair: #e7e2dc;        /* hairline border (neutral) */
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.06); /* neutral only */
+  --radius: 12px;         /* single soft radius scale, applied everywhere */
+  --maxw: 1120px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+/* root font-size sets the rem base; bumped to 17.5px so body copy reads larger
+   and all rem-based type (headings via clamp, .lede, .step-card, etc.) scales with it */
+html { -webkit-text-size-adjust: 100%; font-size: 17.5px; }
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  font-size: 1rem;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* container */
+.wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: 24px; }
+
+/* skip link for keyboard a11y */
+.skip {
+  position: absolute; left: 8px; top: -48px;
+  background: var(--accent-fill); color: #fff;
+  padding: 8px 14px; border-radius: var(--radius); z-index: 50;
+  transition: top .15s ease;
+}
+.skip:focus { top: 8px; }
+
+a { color: var(--accent-ink); }
+a:hover { color: var(--accent-fill); }
+
+/* visible keyboard focus everywhere */
+a:focus-visible, button:focus-visible, .btn:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- nav ---------- */
+.nav {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(250,249,247,.92);
+  border-bottom: 1px solid var(--hair);
+  backdrop-filter: saturate(120%) blur(6px);
+}
+.nav .wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px; gap: 16px;
+}
+.brand {
+  font-family: var(--mono);
+  font-weight: 600; font-size: 15px; letter-spacing: -.01em;
+  color: var(--text); text-decoration: none; white-space: nowrap;
+}
+.brand .dot { color: var(--accent); }
+.navlinks { display: flex; align-items: center; gap: 20px; }
+.navlinks a {
+  font-size: 14.5px; text-decoration: none; color: var(--muted); white-space: nowrap;
+}
+.navlinks a:hover { color: var(--text); }
+.navlinks .nav-github { color: var(--accent-ink); font-weight: 600; }
+@media (max-width: 720px) {
+  .navlinks .nav-secondary { display: none; } /* condense to keep nav on one line */
+}
+@media (max-width: 480px) {
+  /* narrow viewports: tighten nav so the row fits within the padded wrap (no page overflow) */
+  .nav .wrap { padding-inline: 16px; gap: 12px; }
+  .navlinks { gap: 14px; }
+  .brand { font-size: 14px; }
+  .navlinks a { font-size: 13.5px; }
+}
+
+/* ---------- shared section ---------- */
+section { padding: 72px 0; border-bottom: 1px solid var(--hair); }
+/* section-background rhythm: alternate base vs elevated tone */
+.band-surface { background: var(--surface); }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--accent-ink); margin: 0 0 14px;
+}
+h1, h2, h3 { letter-spacing: -.02em; line-height: 1.15; }
+h2 { font-size: clamp(1.6rem, 1.1rem + 1.6vw, 2.2rem); margin: 0 0 14px; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0 0 28px; font-size: 1.06rem; }
+
+/* ---------- hero ---------- */
+.hero { padding: 84px 0 76px; border-bottom: 1px solid var(--hair); }
+.hero h1 {
+  font-size: clamp(2rem, 1.2rem + 3.6vw, 3.3rem);
+  margin: 0 0 20px; max-width: 18ch;
+}
+.hero p.value { font-size: clamp(1.05rem, .98rem + .5vw, 1.25rem); color: var(--muted); max-width: 60ch; margin: 0 0 30px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 38px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 15px; text-decoration: none;
+  padding: 12px 22px; border-radius: var(--radius);
+  white-space: nowrap; transition: background .15s ease, transform .15s ease, color .15s ease, border-color .15s ease;
+}
+.btn-primary { background: var(--accent-fill); color: #fff; border: 1px solid var(--accent-fill); }
+.btn-primary:hover { background: #934426; color: #fff; }
+.btn-primary:active { transform: translateY(1px); }
+.btn-ghost { background: transparent; color: var(--accent-ink); border: 1px solid var(--accent); }
+.btn-ghost:hover { background: rgba(217,119,87,.08); color: var(--accent-fill); }
+.btn-ghost:active { transform: translateY(1px); }
+
+/* pipeline one-liner chip strip in hero */
+.flow {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 14px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--hair);
+  border-radius: var(--radius); padding: 12px 16px; box-shadow: var(--shadow);
+}
+.flow .step { white-space: nowrap; }
+.flow .arrow { color: var(--accent); font-weight: 700; }
+
+/* ---------- principle / who: prose ---------- */
+.prose p { max-width: 72ch; }
+.prose .quote {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 18px; margin: 22px 0; color: var(--text);
+}
+
+/* code block (mono, dark frame) */
+pre {
+  margin: 0;
+  background: var(--code-bg); color: var(--code-fg);
+  border-radius: var(--radius);
+  padding: 16px 18px; overflow-x: auto;
+  font-family: var(--mono); font-size: 13.5px; line-height: 1.55;
+  border: 1px solid #1f1b18;
+}
+pre code { font-family: inherit; color: inherit; background: none; white-space: pre; }
+:not(pre) > code {
+  font-family: var(--mono); font-size: .92em;
+  background: #f0ece6; color: #4a3f37;
+  padding: 1px 6px; border-radius: 6px;
+}
+
+/* ---------- pipeline steps ---------- */
+.steps { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); margin-top: 8px; }
+@media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+.step-card {
+  background: var(--bg);
+  border: 1px solid var(--hair);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.band-surface .step-card { background: var(--surface); }
+.step-card .num {
+  font-family: var(--mono); font-size: 13px; color: var(--accent-ink); font-weight: 700;
+}
+.step-card h3 { font-size: 1.05rem; margin: 6px 0 6px; }
+.step-card p { margin: 0; color: var(--muted); font-size: .96rem; }
+
+/* ---------- mapping table ---------- */
+.table-frame {
+  border: 1px solid var(--hair); border-radius: var(--radius);
+  overflow: hidden; box-shadow: var(--shadow); background: var(--surface);
+}
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+caption { text-align: left; color: var(--muted); font-size: .9rem; padding: 0 0 12px; }
+thead th {
+  text-align: left; font-weight: 600; font-size: 13px;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  background: var(--bg); padding: 12px 18px; border-bottom: 1px solid var(--hair);
+}
+tbody td { padding: 11px 18px; border-bottom: 1px solid var(--hair); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody td:last-child { font-family: var(--mono); font-size: 13.5px; color: var(--text); }
+tbody td:last-child code { background: #f0ece6; }
+
+/* ---------- 3-language example grid ---------- */
+.problem {
+  background: var(--bg); border: 1px solid var(--hair);
+  border-radius: var(--radius); padding: 16px 18px; margin: 0 0 22px; color: var(--muted);
+}
+.band-surface .problem { background: var(--surface); }
+.codegrid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1024px) { .codegrid { grid-template-columns: 1fr; } }
+.codecol { display: flex; flex-direction: column; min-width: 0; }
+.codecol .lang {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  color: var(--accent-ink); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.codecol .lang .tick { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
+.takeaway {
+  margin-top: 22px; padding: 16px 18px;
+  background: var(--bg); border: 1px solid var(--hair); border-left: 3px solid var(--accent);
+  border-radius: var(--radius); color: var(--text);
+}
+.band-surface .takeaway { background: var(--surface); }
+
+/* ---------- install ---------- */
+.install-note { color: var(--muted); margin: 18px 0 0; max-width: 72ch; }
+
+/* ---------- who ---------- */
+.who-list { display: grid; gap: 14px; grid-template-columns: repeat(3, 1fr); margin-top: 8px; }
+@media (max-width: 820px) { .who-list { grid-template-columns: 1fr; } }
+.who-card {
+  background: var(--bg); border: 1px solid var(--hair); border-radius: var(--radius);
+  padding: 18px 20px; color: var(--text);
+}
+.band-surface .who-card { background: var(--surface); }
+.who-card .tag { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); display: block; margin-bottom: 8px; }
+.who-card p { margin: 0; color: var(--muted); font-size: .98rem; }
+
+/* ---------- footer ---------- */
+footer { padding: 48px 0 64px; border-bottom: none; background: var(--surface); }
+.foot-grid { display: flex; flex-wrap: wrap; gap: 24px 48px; justify-content: space-between; align-items: flex-start; }
+.foot-grid .meta { color: var(--muted); font-size: .95rem; max-width: 48ch; }
+.foot-links { display: flex; flex-direction: column; gap: 8px; }
+.foot-links a { text-decoration: none; font-size: .98rem; }
+.foot-links a:hover { text-decoration: underline; }
+.license { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-top: 18px; }
+
+/* reduced motion: disable all animation and transition */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .reveal { animation: fadein .5s ease both; }
+}
+@keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#top">본문 바로가기</a>
+
+<nav class="nav" aria-label="주요">
+  <div class="wrap">
+    <a class="brand" href="#top">human-to-code-translation<span class="dot">.</span></a>
+    <div class="navlinks">
+      <a class="nav-secondary" href="#pipeline">파이프라인</a>
+      <a class="nav-secondary" href="#mapping">매핑표</a>
+      <a class="nav-secondary" href="#example">예제</a>
+      <a href="#install">설치</a>
+      <a class="nav-github" href="https://github.com/cskwork/human-to-code-translation-skill">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+
+  <!-- 1. HERO -->
+  <header class="hero">
+    <div class="wrap reveal">
+      <p class="eyebrow">Claude Code / Codex 스킬</p>
+      <h1>사람의 풀이를 코드로 번역하는 다리를 놓는다</h1>
+      <p class="value">사람이 머릿속으로 푸는 방식을 기계(Python / Java / C)가 실행하는 코드로, 그 중간 다리를 단계적으로 놓아주는 스킬입니다.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/cskwork/human-to-code-translation-skill">GitHub에서 보기</a>
+        <a class="btn btn-ghost" href="#install">설치 방법</a>
+      </div>
+      <div class="flow" aria-label="번역 파이프라인 한 줄 요약">
+        <span class="step">말</span><span class="arrow">→</span>
+        <span class="step">손풀이</span><span class="arrow">→</span>
+        <span class="step">규칙</span><span class="arrow">→</span>
+        <span class="step">변수/흐름</span><span class="arrow">→</span>
+        <span class="step">코드</span><span class="arrow">→</span>
+        <span class="step">트레이싱</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 2. WHAT / 핵심 원리 -->
+  <section id="what" class="band-surface prose">
+    <div class="wrap">
+      <p class="eyebrow">핵심 원리</p>
+      <h2>코드는 갑자기 튀어나오지 않는다</h2>
+      <p class="lede">알고리즘에서 진짜 어려운 건 "푸는 것"이 아니라, 사람이 자연스럽게 하는 일을 기계가 따라 할 수 있는 형태로 번역하는 것입니다. 이 스킬은 그 번역을 6단계 파이프라인과 매핑표로 일관되게 수행합니다.</p>
+      <pre><code>말 → 손풀이 → 규칙(암묵지 명시화) → 변수/흐름 → 코드 → 트레이싱 검증</code></pre>
+      <p class="quote">다리의 <em>의미</em>는 언어와 무관하고(같음), 달라지는 건 <em>문법</em>뿐이다. 그래서 같은 풀이를 C/Java/Python으로 나란히 보여준다.</p>
+    </div>
+  </section>
+
+  <!-- 3. PIPELINE -->
+  <section id="pipeline">
+    <div class="wrap">
+      <p class="eyebrow">번역 파이프라인</p>
+      <h2>6단계, 항상 이 순서로</h2>
+      <p class="lede">코드는 한 번에 나오지 않습니다. 말에서 손풀이로, 규칙으로, 변수와 흐름으로, 그리고 트레이싱 검증까지 순서대로 옮겨집니다.</p>
+      <ol class="steps" style="list-style:none; padding:0; margin:0;">
+        <li class="step-card">
+          <span class="num">01</span>
+          <h3>사람 말로 다시 쓰기</h3>
+          <p>문제를 일상어로 옮기고, 손으로 풀 작은 구체 예제를 하나 정한다. 예: 배열 5칸, target 하나.</p>
+        </li>
+        <li class="step-card">
+          <span class="num">02</span>
+          <h3>손풀이 관찰</h3>
+          <p>답을 먼저 구하지 말고, 답에 이르는 절차를 본다. "내가 실제로 한 일"을 종이에 적어라.</p>
+        </li>
+        <li class="step-card">
+          <span class="num">03</span>
+          <h3>암묵지 명시화</h3>
+          <p>"가운데를 본다", "큰 걸 고른다" 같은 그냥 아는 행동을 정확한 규칙으로 쪼갠다. 가운데 = <code>(low+high)//2</code>? 정수 나눗셈? off-by-one?</p>
+        </li>
+        <li class="step-card">
+          <span class="num">04</span>
+          <h3>상태 → 변수/자료구조</h3>
+          <p>"내가 기억하고 있는 게 뭐지?"를 묻는다. 그 답이 곧 변수와 자료구조다. 아래 매핑표를 사전처럼 쓴다.</p>
+        </li>
+        <li class="step-card">
+          <span class="num">05</span>
+          <h3>흐름과 종료 조건</h3>
+          <p>"~할 때까지" → <code>while</code> + 종료 조건, "~이면" → <code>if</code>, "하나씩" → <code>for</code>. 언제 멈추는지를 반드시 명시한다(무한 루프 방지).</p>
+        </li>
+        <li class="step-card">
+          <span class="num">06</span>
+          <h3>코드 + 트레이싱 검증</h3>
+          <p>규칙 한 줄 ≈ 코드 한 줄로 받아쓴다. 그다음 "없는 값 / 맨 끝 / 빈 입력" 경계를 표로 손 트레이싱한다.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 4. MAPPING TABLE -->
+  <section id="mapping" class="band-surface">
+    <div class="wrap">
+      <p class="eyebrow">핵심 매핑표</p>
+      <h2>사람의 머릿속 행동 → 기계 구성요소</h2>
+      <p class="lede">이 표가 4단계(상태 → 변수)의 사전입니다. "사람의 표현"을 보고 오른쪽을 떠올리세요.</p>
+      <div class="table-frame">
+        <table>
+          <caption class="sr-caption" style="position:absolute;left:-9999px;">사람의 표현과 그에 대응하는 기계 구성요소 14행</caption>
+          <thead>
+            <tr><th scope="col">사람의 표현 / 머릿속 행동</th><th scope="col">기계 구성요소</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>"기억해 둔다 / 머릿속에 담아둔다"</td><td>변수 (variable)</td></tr>
+            <tr><td>"쭉 훑어본다 / 하나씩 차례로 본다"</td><td><code>for</code> 반복문</td></tr>
+            <tr><td>"~인 동안 계속 / ~할 때까지"</td><td><code>while</code> + 종료 조건</td></tr>
+            <tr><td>"가장 큰/작은 걸 고른다"</td><td>max/min 추적 변수 + 비교</td></tr>
+            <tr><td>"지금까지 중 제일 ~"</td><td>누적 변수 (running best/sum)</td></tr>
+            <tr><td>"본 적 있나? / 중복인가?"</td><td>집합(set) / 딕셔너리 membership</td></tr>
+            <tr><td>"이름표 붙여 분류해 모은다"</td><td>딕셔너리/맵 그룹핑</td></tr>
+            <tr><td>"짝을 맞춘다 / 가장 최근 것부터 되돌린다"</td><td>스택(stack)</td></tr>
+            <tr><td>"줄 세워 들어온 순서대로 처리"</td><td>큐(queue)</td></tr>
+            <tr><td>"양쪽 끝에서 가운데로 좁혀온다"</td><td>투 포인터 (두 인덱스 변수)</td></tr>
+            <tr><td>"경우를 나눠서"</td><td><code>if</code> / <code>elif</code> / <code>else</code></td></tr>
+            <tr><td>"표를 그려 칸을 채워나간다"</td><td>2차원 배열 / DP 테이블</td></tr>
+            <tr><td>"n번 똑같이 한다"</td><td><code>for i in range(n)</code></td></tr>
+            <tr><td>"더 작은 같은 문제로 쪼갠다"</td><td>재귀 (recursion)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. WORKED EXAMPLE: BINARY SEARCH, 3 LANGUAGES -->
+  <section id="example">
+    <div class="wrap">
+      <p class="eyebrow">워크드 예제</p>
+      <h2>이진 탐색, 세 언어로 나란히</h2>
+      <p class="lede">정렬된 배열에서 target의 자리 번호를 찾고, 없으면 -1을 반환합니다. 같은 다리(low/high/mid 로직)를 Python, Java, C로 동시에 봅니다.</p>
+      <div class="problem">
+        예제: <code>[2,5,8,12,19]</code>, target=12. 사전을 찾듯 가운데를 펴고, target이 더 크면 왼쪽 절반을 통째로 버린다. "양쪽 끝에서 좁혀온다" → 두 인덱스 <code>low</code>, <code>high</code>. "두 손가락이 안 엇갈리는 동안" → <code>while low &lt;= high</code>.
+      </div>
+      <div class="codegrid">
+        <div class="codecol">
+          <div class="lang"><span class="tick" aria-hidden="true"></span>Python</div>
+<pre><code># Python: 길이는 len(), 정수 나눗셈 //
+def search(arr, target):
+    low, high = 0, len(arr) - 1
+    while low &lt;= high:
+        mid = (low + high) // 2
+        if arr[mid] == target:   return mid
+        elif arr[mid] &lt; target:  low = mid + 1   # 답은 오른쪽
+        else:                    high = mid - 1  # 답은 왼쪽
+    return -1
+</code></pre>
+        </div>
+        <div class="codecol">
+          <div class="lang"><span class="tick" aria-hidden="true"></span>Java</div>
+<pre><code>// Java: 길이는 .length, mid는 오버플로 안전식
+int search(int[] arr, int target) {
+    int low = 0, high = arr.length - 1;
+    while (low &lt;= high) {
+        int mid = low + (high - low) / 2;
+        if (arr[mid] == target) return mid;
+        else if (arr[mid] &lt; target) low = mid + 1;
+        else high = mid - 1;
+    }
+    return -1;
+}
+</code></pre>
+        </div>
+        <div class="codecol">
+          <div class="lang"><span class="tick" aria-hidden="true"></span>C</div>
+<pre><code>/* C: 배열 길이를 인자로 따로 받아야 함 */
+int search(int arr[], int n, int target) {
+    int low = 0, high = n - 1;
+    while (low &lt;= high) {
+        int mid = low + (high - low) / 2;
+        if (arr[mid] == target) return mid;
+        else if (arr[mid] &lt; target) low = mid + 1;
+        else high = mid - 1;
+    }
+    return -1;
+}
+</code></pre>
+        </div>
+      </div>
+      <p class="takeaway"><strong>번역의 교훈:</strong> 의미(가운데 비교 → 절반 버리기)는 셋 다 똑같다. 차이는 길이 얻는 법(<code>len()</code> / <code>.length</code> / 인자), 오버플로 주의(Java·C는 <code>low+(high-low)/2</code>), 타입 명시뿐이다. 다리를 한 번 놓으면 언어는 갈아끼우면 된다.</p>
+    </div>
+  </section>
+
+  <!-- 6. INSTALL -->
+  <section id="install" class="band-surface">
+    <div class="wrap">
+      <p class="eyebrow">설치</p>
+      <h2>Claude Code에 설치</h2>
+      <p class="lede">스킬 저장소를 클론합니다. 복사 시 한 줄로 동작합니다.</p>
+<pre><code>git clone https://github.com/cskwork/human-to-code-translation-skill.git \
+  ~/.claude/skills/human-to-code-translation</code></pre>
+      <p class="install-note"><code>description</code>의 트리거(예: "머릿속으론 풀리는데 코드가 안 써져", 알고리즘 문제를 코드로 옮기기, off-by-one/무한루프)가 잡히면 자동으로 로드됩니다.</p>
+    </div>
+  </section>
+
+  <!-- 7. WHO -->
+  <section id="who">
+    <div class="wrap">
+      <p class="eyebrow">누구에게</p>
+      <h2>이 스킬이 필요한 사람</h2>
+      <div class="who-list">
+        <div class="who-card">
+          <span class="tag">가르치는 사람</span>
+          <p>알고리즘/코딩테스트를 가르치며 입문자에게 "왜 이 코드가 이렇게 되는지" 설명해야 하는 사람.</p>
+        </div>
+        <div class="who-card">
+          <span class="tag">옮기지 못하는 학습자</span>
+          <p>"사람으로는 풀겠는데 코드로 못 옮기겠다"는 상태에서 막혀 있는 학습자.</p>
+        </div>
+        <div class="who-card">
+          <span class="tag">경계 조건에 막히는 사람</span>
+          <p>off-by-one, 무한 루프 같은 경계/종료 조건에서 자꾸 막히는 사람.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- 8. FOOTER -->
+<footer id="footer">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="meta">
+        <a class="brand" href="#top">human-to-code-translation<span class="dot">.</span></a>
+        <p>스택, 해시, DP로의 번역 등 더 많은 워크드 예제는 저장소의 <code>worked-examples.md</code>에서 볼 수 있습니다.</p>
+        <p class="license">MIT License</p>
+      </div>
+      <nav class="foot-links" aria-label="바닥글">
+        <a href="https://github.com/cskwork/human-to-code-translation-skill">GitHub 저장소</a>
+        <a href="https://cskwork.github.io/human-to-code-translation-skill/">랜딩 페이지</a>
+        <a href="#install">설치</a>
+        <a href="#mapping">매핑표</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
